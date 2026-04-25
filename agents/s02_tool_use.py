@@ -113,10 +113,14 @@ TOOLS = [
 
 def agent_loop(messages: list):
     while True:
+        # 2 此时 messages 本身还没变
         response = client.messages.create(
             model=MODEL, system=SYSTEM, messages=messages,
             tools=TOOLS, max_tokens=8000,
         )
+        # 3 messages 变成了 
+        #  [{"role": "user", "content": "请帮我查看 README 并总结"},
+        #  {"role": "assistant", "content": [tool_use(id='toolu_1', name='read_file', ...)]}]
         messages.append({"role": "assistant", "content": response.content})
         if response.stop_reason != "tool_use":
             return
@@ -128,8 +132,12 @@ def agent_loop(messages: list):
                 print(f"> {block.name}:")
                 print(output[:200])
                 results.append({"type": "tool_result", "tool_use_id": block.id, "content": output})
+                # results 是 [{"type": "tool_result", "tool_use_id": block.id, "content": output}]
         messages.append({"role": "user", "content": results})
-
+# 4 messages 变成了 
+# [{"role": "user", "content": "请帮我查看 README 并总结"}, 
+# {"role": "assistant", "content": [tool_use(id='toolu_1', name='read_file', ...)]},
+#  {"role": "user", "content": [{"type": "tool_result", "tool_use_id": block.id, "content": output}] }]
 
 if __name__ == "__main__":
     history = []
@@ -140,7 +148,7 @@ if __name__ == "__main__":
             break
         if query.strip().lower() in ("q", "exit", ""):
             break
-        history.append({"role": "user", "content": query})
+        history.append({"role": "user", "content": query}) # 1 {"role": "user", "content": "请帮我查看 README 并总结"}
         agent_loop(history)
         response_content = history[-1]["content"]
         if isinstance(response_content, list):

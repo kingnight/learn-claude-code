@@ -74,7 +74,11 @@ def micro_compact(messages: list) -> list:
             for part_idx, part in enumerate(msg["content"]):
                 if isinstance(part, dict) and part.get("type") == "tool_result":
                     tool_results.append((msg_idx, part_idx, part))
-    if len(tool_results) <= KEEP_RECENT:
+                    # 关键点1：
+                    # 消息下标 msg_idx，内容块下标 part_idx，该结果对象 part
+                    # tool_results.append((msg_idx, part_idx, part)) 里保存的 part，不是拷贝，而是 messages 内部那个字典对象的引用。
+                    # 这意味着，如果你在 micro_compact 中修改了 part["content"]，那么 messages 中的对应内容也会被修改。
+    if len(tool_results) <= KEEP_RECENT: #如果工具结果总数不超过“保留最近 N 条”的阈值 KEEP_RECENT，就不压缩，直接返回原消息。
         return messages
     # Find tool_name for each result by matching tool_use_id in prior assistant messages
     tool_name_map = {}
@@ -95,6 +99,8 @@ def micro_compact(messages: list) -> list:
         tool_name = tool_name_map.get(tool_id, "unknown")
         if tool_name in PRESERVE_RESULT_TOOLS:
             continue
+        # 关键点2：
+        # 这里修改了 result["content"]，因为 result 是 messages 内部那个字典对象的引用，所以 messages 中的对应内容也会被修改。  
         result["content"] = f"[Previous: used {tool_name}]"
     return messages
 
@@ -107,9 +113,12 @@ def auto_compact(messages: list) -> list:
     with open(transcript_path, "w") as f:
         for msg in messages:
             f.write(json.dumps(msg, default=str) + "\n")
+            # 循环 messages，每条 json.dumps(..., default=str) 写成一行 JSONL。
+            # 目的：即使后面把内存里的历史压缩掉，原始上下文仍可追溯。
     print(f"[transcript saved: {transcript_path}]")
     # Ask LLM to summarize
-    conversation_text = json.dumps(messages, default=str)[-80000:]
+    conversation_text = json.dumps(messages, default=str)[-80000:] 
+    #把整个消息数组序列化成字符串，只取最后 80000 个字符，控制输入规模，避免超长。
     response = client.messages.create(
         model=MODEL,
         messages=[{"role": "user", "content":
@@ -118,7 +127,12 @@ def auto_compact(messages: list) -> list:
             "Be concise but preserve critical details.\n\n" + conversation_text}],
         max_tokens=2000,
     )
+    # 构造一个单独的 user prompt，让模型按 3 点总结：
+    # 1. 完成了什么，
+    # 2. 当前状态，
+    # 3. 关键决策，
     summary = next((block.text for block in response.content if hasattr(block, "text")), "")
+    # 从响应块里拿第一段文本作为摘要。
     if not summary:
         summary = "No summary generated."
     # Replace all messages with compressed summary
