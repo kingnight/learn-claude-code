@@ -3,7 +3,7 @@
 """
 s07_task_system.py - Tasks
 
-Tasks persist as JSON files in .tasks/ so they survive context compression.
+Tasks persist as JSON files in .tasks/ so they survive context compression. 因此即使在进行上下文压缩时也能保持完整。
 Each task has a dependency graph (blockedBy).
 
     .tasks/
@@ -50,8 +50,11 @@ class TaskManager:
         self.dir.mkdir(exist_ok=True)
         self._next_id = self._max_id() + 1
 
+    # 扫描任务目录里已有的任务文件，找出当前最大的任务编号
     def _max_id(self) -> int:
         ids = [int(f.stem.split("_")[1]) for f in self.dir.glob("task_*.json")]
+        # glob (全称 Global) 是一种基于通配符的模式匹配技术
+        # 通过使用通配符（像 *、?）来匹配文件名或文件路径，而不是必须输入完整的文件名。
         return max(ids) if ids else 0
 
     def _load(self, task_id: int) -> dict:
@@ -96,16 +99,23 @@ class TaskManager:
         """Remove completed_id from all other tasks' blockedBy lists."""
         for f in self.dir.glob("task_*.json"):
             task = json.loads(f.read_text())
+            #检查这个任务的 blockedBy（依赖列表）里是否包含刚完成的任务 ID。如果包含，就把这个依赖删掉。
             if completed_id in task.get("blockedBy", []):
-                task["blockedBy"].remove(completed_id)
+                task["blockedBy"].remove(completed_id) 
                 self._save(task)
 
     def list_all(self) -> str:
         tasks = []
+        # 按文件名里的任务编号进行数值排序。
         files = sorted(
             self.dir.glob("task_*.json"),
             key=lambda f: int(f.stem.split("_")[1])
         )
+        # f.stem：文件名去掉后缀（如 task_12）
+        # split("_")[1]：取下划线后面的部分（12）
+        # int(...)：转成整数，避免字符串排序问题（比如 "10" 被排在 "2" 前面）
+        # 所以 key=lambda f: int(f.stem.split("_")[1]) 的效果是：
+        # task_1.json, task_2.json, task_10.json 会按 1,2,10 排，而不是按字符串字典序排。
         for f in files:
             tasks.append(json.loads(f.read_text()))
         if not tasks:

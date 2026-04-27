@@ -32,6 +32,10 @@ Three-layer compression pipeline so the agent can work forever:
                   Same as auto, triggered manually.
 
 Key insight: "The agent can forget strategically and keep working forever."
+
+* 日常编码流程：先不管，交给自动压缩。
+* 阶段切换点：手动 compact 一次（例如“功能A完成，接下来改测试”）。
+* 长会话风险控制：如果你发现工具输出很多、对话明显变慢，也可以提前手动一次，避免临界点触发时上下文过满。
 """
 
 import json
@@ -109,6 +113,14 @@ def micro_compact(messages: list) -> list:
 def auto_compact(messages: list) -> list:
     # Save full transcript to disk
     TRANSCRIPT_DIR.mkdir(exist_ok=True)
+    
+    # JSONL（JSON Lines / .jsonl）：一个文件由多行组成，每一行都是一个独立、完整的 JSON object（或任意 JSON 值）。例如：
+    # {"role": "user", "content": "Hello, how are you?"}
+    # 为什么要用 jsonl？ 
+    # 1. 流式追加更方便：新消息直接 append 一行，不用读出整个数组再写回。
+    # 2.容错更好：最后一行写坏了，通常只影响那一行；而 JSON 数组文件写到一半可能整个文件都无法解析。
+    # 3.处理方式不同：JSON 往往一次性 json.load；JSONL 通常逐行 json.loads(line)
+    # 4. 更适合大文件：JSON 文件过大时，读取效率低；JSONL 逐行读取，更高效。
     transcript_path = TRANSCRIPT_DIR / f"transcript_{int(time.time())}.jsonl"
     with open(transcript_path, "w") as f:
         for msg in messages:

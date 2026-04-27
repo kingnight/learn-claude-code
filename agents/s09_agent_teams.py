@@ -92,7 +92,7 @@ class MessageBus:
         }
         if extra:
             msg.update(extra)
-        inbox_path = self.dir / f"{to}.jsonl"
+        inbox_path = self.dir / f"{to}.jsonl" # 收件人邮箱文件路径
         with open(inbox_path, "a") as f:
             f.write(json.dumps(msg) + "\n")
         return f"Sent {msg_type} to {to}"
@@ -143,26 +143,28 @@ class TeammateManager:
                 return m
         return None
 
+    # 创建队友“启动/复用一个队员(agent)线程去干活”，并把它登记到团队配置里
     def spawn(self, name: str, role: str, prompt: str) -> str:
-        member = self._find_member(name)
-        if member:
+        member = self._find_member(name) # 查找队友是否存在
+        if member: # 如果队友存在，检查状态是否可以被启动
             if member["status"] not in ("idle", "shutdown"):
                 return f"Error: '{name}' is currently {member['status']}"
             member["status"] = "working"
-            member["role"] = role
-        else:
+            member["role"] = role  
+        else: # 如果队友不存在，创建一个新队友，并把它登记到团队配置里
             member = {"name": name, "role": role, "status": "working"}
             self.config["members"].append(member)
-        self._save_config()
+        self._save_config() # 保存团队配置
         thread = threading.Thread(
             target=self._teammate_loop,
             args=(name, role, prompt),
             daemon=True,
         )
-        self.threads[name] = thread
+        self.threads[name] = thread # 把线程登记到团队配置里
         thread.start()
         return f"Spawned '{name}' (role: {role})"
 
+    # 队友线程的干活循环
     def _teammate_loop(self, name: str, role: str, prompt: str):
         sys_prompt = (
             f"You are '{name}', role: {role}, at {WORKDIR}. "
@@ -170,10 +172,10 @@ class TeammateManager:
         )
         messages = [{"role": "user", "content": prompt}]
         tools = self._teammate_tools()
-        for _ in range(50):
-            inbox = BUS.read_inbox(name)
+        for _ in range(50):# 最多50轮对话
+            inbox = BUS.read_inbox(name) # 读取收件箱
             for msg in inbox:
-                messages.append({"role": "user", "content": json.dumps(msg)})
+                messages.append({"role": "user", "content": json.dumps(msg)}) # 把收件箱里的消息添加到对话历史中
             try:
                 response = client.messages.create(
                     model=MODEL,

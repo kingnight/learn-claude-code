@@ -56,6 +56,7 @@ class BackgroundManager:
     def run(self, command: str) -> str:
         """Start a background thread, return task_id immediately."""
         task_id = str(uuid.uuid4())[:8]
+        # tasks 结构：{task_id: {"status": "running", "result": None, "command": command}}
         self.tasks[task_id] = {"status": "running", "result": None, "command": command}
         thread = threading.Thread(
             target=self._execute, args=(task_id, command), daemon=True
@@ -66,6 +67,7 @@ class BackgroundManager:
     def _execute(self, task_id: str, command: str):
         """Thread target: run subprocess, capture output, push to queue."""
         try:
+            # 具有可访问输入/输出流的子进程，此模块允许启动进程、连接到其输入/输出/错误管道，并获取其返回码。
             r = subprocess.run(
                 command, shell=True, cwd=WORKDIR,
                 capture_output=True, text=True, timeout=300
@@ -81,6 +83,7 @@ class BackgroundManager:
         self.tasks[task_id]["status"] = status
         self.tasks[task_id]["result"] = output or "(no output)"
         with self._lock:
+            # _notification_queue 是多线程共享数据。通过 with self._lock: 来保护。
             self._notification_queue.append({
                 "task_id": task_id,
                 "status": status,
