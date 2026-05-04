@@ -98,7 +98,31 @@ TOOL_HANDLERS = {
     "write_file": lambda **kw: run_write(kw["path"], kw["content"]),
     "edit_file":  lambda **kw: run_edit(kw["path"], kw["old_text"], kw["new_text"]),
 }
+"""
+lambda 用来在表达式里定义一个「匿名小函数」，不必写 def 函数名(...):。
 
+一般形式：lambda 参数1, 参数2, ... : 表达式（只能一行，其值就是返回值）
+以 read_file 为例
+```
+def _read_file_handler(**kw):
+    return run_read(kw["path"], kw.get("limit"))
+```
+字典里写 lambda **kw: run_read(...) 就是把这个小函数当场造出来，当作字典的值存进去。
+
+这里的 **kw 是干什么的
+```
+output = handler(**block.input) if handler else f"Unknown tool: {block.name}"
+```
+block.input 是一个「工具参数字典」，例如 {"path": "README.md", "limit": 50}。
+前面的 ** 表示把字典拆成关键字参数传给 handler，等价于：
+```
+handler(path="README.md", limit=50)
+```
+所以 lambda **kw: 表示：不管传进来哪些关键字参数，都收进字典 kw 里，再在函数体里用 kw["path"]、kw.get("limit") 等取出来交给 run_read / run_bash 等。
+
+不同工具参数名不同（command、path、content…），用同一个 **kw 签名就能统一写成「从 kw 里取需要的键」，和 handler(**block.input) 这种调用方式正好配上。
+"""
+# 工具列表,给模型看的,描述每个工具的用途和输入格式
 TOOLS = [
     {"name": "bash", "description": "Run a shell command.",
      "input_schema": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]}},
@@ -156,3 +180,11 @@ if __name__ == "__main__":
                 if hasattr(block, "text"):
                     print(block.text)
         print()
+
+
+"""
+目标：
+1.理解核心流程
+2.理解messages的变化
+3.理解TOOLS的格式
+""" 

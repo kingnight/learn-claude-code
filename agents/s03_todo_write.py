@@ -3,8 +3,8 @@
 """
 s03_todo_write.py - TodoWrite
 
-The model tracks its own progress via a TodoManager. A nag reminder
-forces it to keep updating when it forgets.
+The model tracks its own progress via a TodoManager. A nag（唠叨） reminder
+forces it to keep updating when it forgets.（提醒它不要忘记更新）
 
     +----------+      +-------+      +---------+
     |   User   | ---> |  LLM  | ---> | Tools   |
@@ -46,7 +46,7 @@ MODEL = os.environ["MODEL_ID"]
 SYSTEM = f"""You are a coding agent at {WORKDIR}.
 Use the todo tool to plan multi-step tasks. Mark in_progress before starting, completed when done.
 Prefer tools over prose."""
-
+# 使用待办事项工具来规划多步骤任务。开始前标记为“进行中”，完成后标记为“已完成”。优先使用工具而非文字描述。
 
 # -- TodoManager: structured state the LLM writes to --
 class TodoManager:
@@ -79,11 +79,13 @@ class TodoManager:
             return "No todos."
         lines = []
         for item in self.items:
+            # self.items 里是已校验过的 id / text / status 字段
+            # 根据 status 字段，选择对应的标记符：pending 用 [ ]，in_progress 用 [>]，completed 用 [x]
             marker = {"pending": "[ ]", "in_progress": "[>]", "completed": "[x]"}[item["status"]]
-            lines.append(f"{marker} #{item['id']}: {item['text']}")
+            lines.append(f"{marker} #{item['id']}: {item['text']}") # 把标记符、id 和 text 拼成一行
         done = sum(1 for t in self.items if t["status"] == "completed")
-        lines.append(f"\n({done}/{len(self.items)} completed)")
-        return "\n".join(lines)
+        lines.append(f"\n({done}/{len(self.items)} completed)") # 最后加一行统计已完成数量
+        return "\n".join(lines) # 把所有行拼成一个字符串返回
 
 
 TODO = TodoManager()
@@ -186,9 +188,9 @@ def agent_loop(messages: list):
                 results.append({"type": "tool_result", "tool_use_id": block.id, "content": str(output)})
                 if block.name == "todo":
                     used_todo = True
-        rounds_since_todo = 0 if used_todo else rounds_since_todo + 1
+        rounds_since_todo = 0 if used_todo else rounds_since_todo + 1 # 如果used_todo为True，则rounds_since_todo为0，否则rounds_since_todo加1
         if rounds_since_todo >= 3:
-            results.append({"type": "text", "text": "<reminder>Update your todos.</reminder>"})
+            results.append({"type": "text", "text": "<reminder>Update your todos.</reminder>"}) # 如果rounds_since_todo大于等于3，则添加一个提醒
         messages.append({"role": "user", "content": results})
 
 

@@ -102,19 +102,47 @@ def agent_loop(messages: list):
 
 
 if __name__ == "__main__":
+    # Shared message list: agent_loop appends assistant turns and tool-result user turns in place.
     history = []
     while True:
         try:
+            # 先打印一行带颜色的 s01 >> ，光标停在这行末尾，然后 input() 读取你敲的一整行，返回值赋给 query。
+            # 若没有这个参数，等价于 input("")，就不会先打印任何提示。
             query = input("\033[36ms01 >> \033[0m")
         except (EOFError, KeyboardInterrupt):
+            # Ctrl+D / Ctrl+C — exit without traceback
             break
         if query.strip().lower() in ("q", "exit", ""):
             break
         history.append({"role": "user", "content": query})
-        agent_loop(history)
+        agent_loop(history)  # mutates history until stop_reason != tool_use
+        # Last turn is assistant; content may be a list of blocks (text, tool_use, …).
         response_content = history[-1]["content"]
         if isinstance(response_content, list):
             for block in response_content:
                 if hasattr(block, "text"):
-                    print(block.text)
+                    print(block.text)  # bash output was already printed inside agent_loop
         print()
+
+
+"""
+外层（if __name__ == "__main__" 里的 while True）
+
+* 作用：交互式会话：读一行用户输入 → 跑一轮任务 → 再读下一行。
+* 结束条件：用户输入 q / exit / 空行，或 Ctrl+C / Ctrl+D。
+* 若没有这层，程序跑完一次对话就会直接退出，没法连续多问。
+
+内层（agent_loop 里的 while True）
+
+* 作用：单次用户请求内部的「模型 ↔ 工具」闭环：只要 stop_reason == "tool_use"，就执行工具、把结果写回 messages、再调 API，直到模型不再要工具。
+* 结束条件：response.stop_reason != "tool_use"（模型给出最终答复或不再调用工具）。
+* 这是脚本开头注释里画的那个 agent 核心模式；一轮用户消息里可能有多轮 API 调用。
+
+关系可以概括成：
+
+会话层：while True          # 多轮「用户提问」
+  └── 任务层：agent_loop     # 每一问里可能多次「要工具 → 执行 → 再要模型」
+所以不是「同一个死循环写了两遍」，而是 外层管「要不要接着聊」，内层管「这一问里要不要接着用工具」；
+职责分离是合理且常见的写法。若强行合成一个 while，反而要把「读 input」和「调模型 / 跑工具」搅在一起，更难读。
+
+"""
