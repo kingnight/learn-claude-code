@@ -124,7 +124,7 @@ def auto_compact(messages: list) -> list:
     transcript_path = TRANSCRIPT_DIR / f"transcript_{int(time.time())}.jsonl"
     with open(transcript_path, "w") as f:
         for msg in messages:
-            f.write(json.dumps(msg, default=str) + "\n")
+            f.write(json.dumps(msg, default=str) + "\n") # json.dumps 把 Python 对象序列化成字符串
             # 循环 messages，每条 json.dumps(..., default=str) 写成一行 JSONL。
             # 目的：即使后面把内存里的历史压缩掉，原始上下文仍可追溯。
     print(f"[transcript saved: {transcript_path}]")
@@ -140,11 +140,12 @@ def auto_compact(messages: list) -> list:
         max_tokens=2000,
     )
     # 构造一个单独的 user prompt，让模型按 3 点总结：
-    # 1. 完成了什么，
+    # 1. 完成了什么
     # 2. 当前状态，
-    # 3. 关键决策，
-    summary = next((block.text for block in response.content if hasattr(block, "text")), "")
+    # 3. 关键决策
+
     # 从响应块里拿第一段文本作为摘要。
+    summary = next((block.text for block in response.content if hasattr(block, "text")), "")
     if not summary:
         summary = "No summary generated."
     # Replace all messages with compressed summary

@@ -74,7 +74,7 @@ class TaskManager:
         }
         self._save(task)
         self._next_id += 1
-        return json.dumps(task, indent=2, ensure_ascii=False)
+        return json.dumps(task, indent=2, ensure_ascii=False) # json.dumps 把 Python 对象序列化成 字符串
 
     def get(self, task_id: int) -> str:
         return json.dumps(self._load(task_id), indent=2, ensure_ascii=False)
