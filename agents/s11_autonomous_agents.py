@@ -5,7 +5,7 @@ s11_autonomous_agents.py - Autonomous Agents
 
 Idle cycle with task board polling, auto-claiming unclaimed tasks, and
 identity re-injection after context compression. Builds on s10's protocols.
-
+带有任务板轮询功能的空闲循环、自动认领未被占用的任务以及在上下文压缩后重新注入身份标识。其基于 s10 的协议构建而成。
     Teammate lifecycle:
     +-------+
     | spawn |
@@ -130,8 +130,8 @@ def scan_unclaimed_tasks() -> list:
     for f in sorted(TASKS_DIR.glob("task_*.json")):
         task = json.loads(f.read_text())
         if (task.get("status") == "pending"
-                and not task.get("owner")
-                and not task.get("blockedBy")):
+                and not task.get("owner") # 未被占用的任务
+                and not task.get("blockedBy")): # 未被阻塞的任务
             unclaimed.append(task)
     return unclaimed
 
@@ -221,7 +221,7 @@ class TeammateManager:
         )
         messages = [{"role": "user", "content": prompt}]
         tools = self._teammate_tools()
-
+        # 队友循环分两个阶段: WORK 和 IDLE。LLM 停止调用工具 (或调用了 `idle`) 时, 进入 IDLE。
         while True:
             # -- WORK PHASE: standard agent loop --
             for _ in range(50):
@@ -267,7 +267,7 @@ class TeammateManager:
             # -- IDLE PHASE: poll for inbox messages and unclaimed tasks --
             self._set_status(name, "idle")
             resume = False
-            polls = IDLE_TIMEOUT // max(POLL_INTERVAL, 1)
+            polls = IDLE_TIMEOUT // max(POLL_INTERVAL, 1) # 60s / 5s = 12
             for _ in range(polls):
                 time.sleep(POLL_INTERVAL)
                 inbox = BUS.read_inbox(name)
@@ -279,16 +279,17 @@ class TeammateManager:
                         messages.append({"role": "user", "content": json.dumps(msg)})
                     resume = True
                     break
-                unclaimed = scan_unclaimed_tasks()
-                if unclaimed:
+                unclaimed = scan_unclaimed_tasks() # 任务看板扫描: 找 pending 状态、无 owner、未被阻塞的任务。
+                if unclaimed: # 如果找到了未被占用的任务，则认领任务。
                     task = unclaimed[0]
-                    result = claim_task(task["id"], name)
+                    result = claim_task(task["id"], name) # 认领任务。
                     if result.startswith("Error:"):
                         continue
                     task_prompt = (
                         f"<auto-claimed>Task #{task['id']}: {task['subject']}\n"
                         f"{task.get('description', '')}</auto-claimed>"
                     )
+                    # 身份重注入: 上下文过短 (说明发生了压缩) 时, 在开头插入身份块。
                     if len(messages) <= 3:
                         messages.insert(0, make_identity_block(name, role, team_name))
                         messages.insert(1, {"role": "assistant", "content": f"I am {name}. Continuing."})

@@ -256,7 +256,7 @@ class WorktreeManager:
             capture_output=True,
             text=True,
             timeout=120,
-        )
+        ) # 运行 git 命令。
         if r.returncode != 0:
             msg = (r.stdout + r.stderr).strip()
             raise RuntimeError(msg or f"git {' '.join(args)} failed")
